@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <SFML/Graphics.hpp>
 #include <windows.h>
+#include <iostream>
 int main()
 {
     sf::RenderWindow window(sf::VideoMode(800, 600), "SFML works!");
@@ -40,8 +41,15 @@ int main()
         vertices.push_back(vertex1);
         vertices.push_back(vertex2);
     }
-
+    std::string timeInSeconds = "0";
     bool ifComplete = false;
+    sf::Clock clock;
+    sf::Font font;
+    if (!font.loadFromFile("C:\\archit_3\\open-sans\\OpenSans-Regular.ttf"))
+    {
+        std::cout << "font error";
+    }
+
     while (window.isOpen())
     {
         sf::Event event;
@@ -50,25 +58,41 @@ int main()
             if (event.type == sf::Event::Closed)
                 window.close();
         }
-
-        window.clear();
+        // this was using bubble sort
+        //window.clear();
         if (ifComplete == false) {
             for (int i = 0; i < 2 * N; i++) {
+                bool ifSwap = false;
                 for (int j = 1; j < 2 * N - 2; j = j + 2) {
                     if (vertices[j].position.y > vertices[j + 2].position.y) {
                         std::swap(vertices[j].position.x, vertices[j + 2].position.x);
                         std::swap(vertices[j], vertices[j + 2]);
+                        ifSwap = true;
                     }
+
+                    sf::Text text;
+                    text.setFont(font);
+                    sf::Time t = clock.getElapsedTime();
+                    timeInSeconds = std::to_string(t.asSeconds());
+                    text.setString("Time elapsed: " + timeInSeconds + " seconds");
+                    text.setCharacterSize(24);
+                    text.setFillColor(sf::Color::Red);
+                    text.setPosition(sf::Vector2f(10.f, 550.f));
+
                     window.clear();
                     sf::sleep(sf::seconds(0.0008f));
                     window.draw(&vertices[0], 2 * N, sf::Lines);
+                    window.draw(text);
                     window.display();
                 }
+                if (ifSwap == false) {
+                    break;
+                }
             }
+
+            std::cout << "Time elapsed on sorting of bubble sort is: " << timeInSeconds;
             ifComplete = true;
         }
-
-        window.display();
     }
 
 
