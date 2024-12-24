@@ -13,7 +13,7 @@ const int WINDOW_HEIGHT = 600;
 
 // Sorting bars
 const int NUM_BARS = 100;
-const float BAR_WIDTH = static_cast<float>(WINDOW_WIDTH) / (2 * NUM_BARS);
+const float BAR_WIDTH = static_cast<float>(WINDOW_WIDTH) / (3 * NUM_BARS);
 
 // Bubble Sort Step
 void bubbleSortStep(std::vector<int>& array, int& i, int& j, bool& sorted) {
@@ -51,11 +51,33 @@ void insertionSortStep(std::vector<int>& array, int& i, int& j, bool& sorted) {
     }
 }
 
+// Selection Sort Step
+void selectionSortStep(std::vector<int>& array, int& i, int& j, int& minIndex, bool& sorted) {
+    if (i < array.size()-1) {
+        // int minIndex = i;
+        if (j < array.size()) {
+            if (array[j] < array[minIndex]) {
+                minIndex = j;
+            }
+            j++;
+        }
+        else {
+            std:: swap(array[i], array[minIndex]);
+            i++;
+            minIndex = i;
+            j = i + 1;
+        }
+    }
+    else {
+        sorted = true;
+    }
+}
+
 // Draw bars for sorting visualization
 void drawBars(sf::RenderWindow& window, const std::vector<int>& array, int startX, float barWidth, sf::Color color) {
     for (size_t i = 0; i < array.size(); i++) {
         sf::RectangleShape bar(sf::Vector2f(barWidth - 1, array[i]));
-        bar.setPosition(startX + i * barWidth, WINDOW_HEIGHT - array[i]);
+        bar.setPosition(startX + i * barWidth, WINDOW_HEIGHT/2 - array[i]);
         bar.setFillColor(color);
         window.draw(bar);
     }
@@ -81,21 +103,22 @@ int main() {
 
     // Randomize the height of bars
     std::srand(static_cast<unsigned>(std::time(0)));
-    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS);
+    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS), selectionArray(NUM_BARS);
     for (int i = 0; i < NUM_BARS; i++) {
-        int height = (std::rand() % (WINDOW_HEIGHT - 50)) + 10;
+        int height = (std::rand() % (WINDOW_HEIGHT/2 - 50)) + 10; // we add 10 minimum height, so that the value is not 0 which will make it invisible to see the bar
         bubbleArray[i] = height;
         insertionArray[i] = height;
+        selectionArray[i] = height;
     }
 
     // Variables for sorting
-    int bubbleI = 0, bubbleJ = 0, insertionI = 1, insertionJ = 1;
-    bool bubbleSorted = false, insertionSorted = false;
-    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false;
+    int bubbleI = 0, bubbleJ = 0, insertionI = 1, insertionJ = 1, selectionI = 0, selectionJ = 0, selectionMinIndex = 0;
+    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false;
+    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false;
 
     // Timers for sorting algorithms
-    sf::Clock bubbleClock, insertionClock;
-    float bubbleElapsed = 0, insertionElapsed = 0;
+    sf::Clock bubbleClock, insertionClock, selectionClock;
+    float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0;
 
     // Main loop
     while (window.isOpen()) {
@@ -120,6 +143,13 @@ int main() {
             insertionElapsed += insertionClock.getElapsedTime().asSeconds();
         }
 
+        // Perform Selection Sort step and update timer
+        if (!selectionSorted) {
+            selectionClock .restart();  // Start timing Insertion Sort step
+            selectionSortStep(selectionArray, selectionI, selectionJ,selectionMinIndex, selectionSorted);
+            selectionElapsed += selectionClock.getElapsedTime().asSeconds();
+        }
+
         // Render visualization
         window.clear(sf::Color::Black);
 
@@ -140,7 +170,7 @@ int main() {
         // Draw Insertion Sort bars
         if (!insertionSorted) {
             insertionClock.restart();
-            drawBars(window, insertionArray, WINDOW_WIDTH / 2, BAR_WIDTH, sf::Color::Blue);
+            drawBars(window, insertionArray, WINDOW_WIDTH / 3, BAR_WIDTH, sf::Color::Blue);
             insertionElapsed += insertionClock.getElapsedTime().asSeconds();
         }
         else {
@@ -148,7 +178,21 @@ int main() {
                 consolePrintInsertionSortTime = true;
                 std::cout << "Insertion Sorting Completed in " << std::to_string(insertionElapsed) << " seconds!\n";
             }
-            drawBars(window, insertionArray, WINDOW_WIDTH / 2, BAR_WIDTH, sf::Color::Blue);
+            drawBars(window, insertionArray, WINDOW_WIDTH / 3, BAR_WIDTH, sf::Color::Blue);
+        }
+
+        // Draw Selection Sort bars
+        if (!selectionSorted) {
+            selectionClock.restart();
+            drawBars(window, selectionArray, WINDOW_WIDTH* 2 / 3, BAR_WIDTH, sf::Color::Green);
+            selectionElapsed += selectionClock.getElapsedTime().asSeconds();
+        }
+        else {
+            if (!consolePrintSelectionSortTime) {
+                consolePrintSelectionSortTime = true;
+                std::cout << "Selection Sorting Completed in " << std::to_string(selectionElapsed) << " seconds!\n";            
+            }
+            drawBars(window, selectionArray, WINDOW_WIDTH * 2 / 3, BAR_WIDTH, sf::Color::Green);
         }
 
         // Display sorting times
@@ -159,13 +203,18 @@ int main() {
 
         sf::Text insertionTimeText("Insertion Sort Time: " + formatTime(insertionElapsed), font, 20);
         insertionTimeText.setFillColor(sf::Color::White);
-        insertionTimeText.setPosition(WINDOW_WIDTH / 2 + 10, 10);
+        insertionTimeText.setPosition(WINDOW_WIDTH/ 3 + 10, 10);
         window.draw(insertionTimeText);
+
+        sf::Text selectionTimeText("Selection Sort Time: " + formatTime(selectionElapsed), font, 20);
+        selectionTimeText.setFillColor(sf::Color::White);
+        selectionTimeText.setPosition(WINDOW_WIDTH * 2 / 3 + 10, 10);
+        window.draw(selectionTimeText);
 
         window.display();
 
         // Slow down the visualization for clarity
-        //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     return 0;
