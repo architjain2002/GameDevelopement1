@@ -12,9 +12,12 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
 // Sorting bars
-const int NUM_BARS = 200;
+const int NUM_BARS = 100;
 const float BAR_WIDTH = static_cast<float>(WINDOW_WIDTH) / (3 * NUM_BARS);
 
+
+
+void drawBars(sf::RenderWindow& window, const std::vector<int>& array, int startX, int startY, float barWidth, sf::Color color);
 // Bubble Sort Step
 void bubbleSortStep(std::vector<int>& array, int& i, int& j, bool& sorted) {
     if (i < array.size() - 1) {
@@ -73,62 +76,155 @@ void selectionSortStep(std::vector<int>& array, int& i, int& j, int& minIndex, b
     }
 }
 
-void merge(std::vector<int>& array, int left, int mid, int right, std::vector<int>& temp) {
-    int i = left, j = mid + 1, k = left;
+//void merge(std::vector<int>& array, int left, int mid, int right, std::vector<int> temp, sf::RenderWindow& window) {
+//    int i = left, j = mid + 1, k = left;
+//
+//
+//    // Merge the two subarrays into a temporary array
+//    while (i <= mid && j <= right) {
+//        if (array[i] <= array[j]) {
+//            temp[k++] = array[i++];
+//        }
+//        else {
+//            temp[k++] = array[j++];
+//        }
+//    }
+//
+//    // Copy remaining elements from left subarray
+//    while (i <= mid) {
+//        temp[k++] = array[i++];
+//    }
+//
+//    // Copy remaining elements from right subarray
+//    while (j <= right) {
+//        temp[k++] = array[j++];
+//    }
+//
+//    // Copy the sorted elements back into the original array
+//    for (int idx = left; idx <= right; idx++) {
+//        array[idx] = temp[idx];
+//    }
+//}
+//
+//
+//// Merge Sort Step
+//void mergeSortStep(std::vector<int>& array, std::vector<int> temp, int& size, int& left, bool& sorted, sf::RenderWindow& window) {
+//    int n = array.size();
+//
+//    if (size >= n) {
+//        sorted = true; // If the size exceeds the array, sorting is complete
+//        return;
+//    }
+//
+//    int mid = std::min(left + size - 1, n-1);      // Calculate mid-
+//
+//    int right = std::min(left + 2*size - 1, n - 1); // Ensure the right index doesn't exceed array bounds
+//
+//    // Merge the current segment
+//    merge(array, left, mid, right, temp, window);
+//
+//    // Move to the next segment
+//    left += 2*size;
+//
+//    // If the entire array has been processed, double the size of segments
+//    if (left >= n) {
+//        left = 0;  // Reset left index for the next pass
+//        size *= 2; // Double the size of the segments
+//    }
+//}
 
+struct MergeState {
+    int left;           // Left index of the current segment
+    int mid;            // Midpoint of the current segment
+    int right;          // Right index of the current segment
+    int i;              // Index for the left subarray
+    int j;              // Index for the right subarray
+    int k;              // Index for the merged array
+    int n1;             // Size of the left subarray
+    int n2;             // Size of the right subarray
+    std::vector<int> L; // Left subarray
+    std::vector<int> R; // Right subarray
+    bool mergeComplete; // Flag to indicate merge completion
+};
 
-    // Merge the two subarrays into a temporary array
-    while (i <= mid && j <= right) {
-        if (array[i] <= array[j]) {
-            temp[k++] = array[i++];
+void initializeMergeState(std::vector<int>& array, MergeState& state, int left, int mid, int right) {
+    state.left = left;
+    state.mid = mid;
+    state.right = right;
+    state.n1 = mid - left + 1;
+    state.n2 = right - mid;
+    state.i = 0;
+    state.j = 0;
+    state.k = left;
+    state.L.assign(array.begin() + left, array.begin() + mid + 1);
+    state.R.assign(array.begin() + mid + 1, array.begin() + right + 1);
+    state.mergeComplete = false;
+}
+
+void mergeStep(std::vector<int>& array, MergeState& state) {
+    if (state.i < state.n1 && state.j < state.n2) {
+        if (state.L[state.i] <= state.R[state.j]) {
+            array[state.k] = state.L[state.i];
+            state.i++;
         }
         else {
-            temp[k++] = array[j++];
+            array[state.k] = state.R[state.j];
+            state.j++;
         }
+        state.k++;
     }
-
-    // Copy remaining elements from left subarray
-    while (i <= mid) {
-        temp[k++] = array[i++];
+    else if (state.i < state.n1) {
+        array[state.k] = state.L[state.i];
+        state.i++;
+        state.k++;
     }
-
-    // Copy remaining elements from right subarray
-    while (j <= right) {
-        temp[k++] = array[j++];
+    else if (state.j < state.n2) {
+        array[state.k] = state.R[state.j];
+        state.j++;
+        state.k++;
     }
-
-    // Copy the sorted elements back into the original array
-    for (int idx = left; idx <= right; idx++) {
-        array[idx] = temp[idx];
+    else {
+        state.mergeComplete = true; // Merge for this step is done
     }
 }
 
 
-// Merge Sort Step
-void mergeSortStep(std::vector<int>& array, std::vector<int>& temp, int& size, int& left, bool& sorted) {
+void mergeSortStep(std::vector<int>& array, int& size, int& left, bool& sorted, MergeState& mergeState, bool& merging) {
     int n = array.size();
 
     if (size >= n) {
-        sorted = true; // If the size exceeds the array, sorting is complete
+        sorted = true; // Sorting is complete
         return;
     }
 
-    int mid = std::min(left + size - 1, n-1);      // Calculate mid-
+    // Initialize merge state if not currently merging
+    if (!merging) {
+        int mid = std::min(left + size - 1, n - 1);           // Calculate midpoint
+        int right = std::min(left + 2 * size - 1, n - 1);     // Calculate right index
+        initializeMergeState(array, mergeState, left, mid, right);
+        merging = true;
+    }
+    else {
+        // Perform a single step of merging
+        mergeStep(array, mergeState);
 
-    int right = std::min(left + 2*size - 1, n - 1); // Ensure the right index doesn't exceed array bounds
+        // If merging is complete, proceed to the next segment
+        if (mergeState.mergeComplete) {
+            left += 2 * size;
+            merging = false; // Reset merging state
 
-    // Merge the current segment
-    merge(array, left, mid, right, temp);
-
-    // Move to the next segment
-    left += 2*size;
-
-    // If the entire array has been processed, double the size of segments
-    if (left >= n) {
-        left = 0;  // Reset left index for the next pass
-        size *= 2; // Double the size of the segments
+            // If all segments are processed, double the size
+            if (left >= n) {
+                left = 0;
+                size *= 2;
+                if (size >= n) {
+                    sorted = true;
+                }
+            }
+        }
     }
 }
+
 
 
 // Draw bars for sorting visualization
@@ -172,12 +268,15 @@ int main() {
 
     // Variables for sorting
     int bubbleI = 0, bubbleJ = 0, insertionI = 1, insertionJ = 1, selectionI = 0, selectionJ = 0, selectionMinIndex = 0, mergeSize = 1, mergeLeft = 0;
-    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false, mergeSorted = false;
+    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false, mergeSorted = false, mergingFlag = false;
     bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false, consolePrintMergeSortTime = false;
 
     // Timers for sorting algorithms
     sf::Clock bubbleClock, insertionClock, selectionClock, mergeClock;
     float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0, mergeElapsed = 0;
+
+    MergeState mergeState;
+    
 
     // Main loop
     while (window.isOpen()) {
@@ -187,6 +286,9 @@ int main() {
                 window.close();
             }
         }
+
+        // Render visualization
+        window.clear(sf::Color::Black);
 
         // Perform Bubble Sort step and update timer
         if (!bubbleSorted) {
@@ -210,14 +312,17 @@ int main() {
         }
 
         // Perform Merge Sort step and update timer
+        //if (!mergeSorted) {
+        //    mergeClock.restart();  // Start timing Insertion Sort step
+        //    mergeSortStep(mergeArray, mergeArray, mergeSize, mergeLeft, mergeSorted, window);
+        //    mergeElapsed += mergeClock.getElapsedTime().asSeconds();
+        //}
+
         if (!mergeSorted) {
-            mergeClock.restart();  // Start timing Insertion Sort step
-            mergeSortStep(mergeArray, tempMergeArray, mergeSize, mergeLeft, mergeSorted);
+            mergeClock.restart();
+            mergeSortStep(mergeArray, mergeSize, mergeLeft, mergeSorted, mergeState, mergingFlag);
             mergeElapsed += mergeClock.getElapsedTime().asSeconds();
         }
-
-        // Render visualization
-        window.clear(sf::Color::Black);
 
         // Draw Bubble Sort bars
         if (!bubbleSorted) {
@@ -262,7 +367,7 @@ int main() {
         }
 
         // Draw Merge Sort bars
-        if (!mergeSorted) {
+        if(!mergeSorted){
             mergeClock.restart();
             drawBars(window, mergeArray, 0, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::Yellow);
             mergeElapsed += mergeClock.getElapsedTime().asSeconds();
@@ -299,7 +404,7 @@ int main() {
         window.display();
 
         // Slow down the visualization for clarity
-        // std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     return 0;
