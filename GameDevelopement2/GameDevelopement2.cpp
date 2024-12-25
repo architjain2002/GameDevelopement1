@@ -12,7 +12,7 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
 // Sorting bars
-const int NUM_BARS = 100;
+const int NUM_BARS = 200;
 const float BAR_WIDTH = static_cast<float>(WINDOW_WIDTH) / (3 * NUM_BARS);
 
 // Bubble Sort Step
@@ -73,11 +73,69 @@ void selectionSortStep(std::vector<int>& array, int& i, int& j, int& minIndex, b
     }
 }
 
+void merge(std::vector<int>& array, int left, int mid, int right, std::vector<int>& temp) {
+    int i = left, j = mid + 1, k = left;
+
+
+    // Merge the two subarrays into a temporary array
+    while (i <= mid && j <= right) {
+        if (array[i] <= array[j]) {
+            temp[k++] = array[i++];
+        }
+        else {
+            temp[k++] = array[j++];
+        }
+    }
+
+    // Copy remaining elements from left subarray
+    while (i <= mid) {
+        temp[k++] = array[i++];
+    }
+
+    // Copy remaining elements from right subarray
+    while (j <= right) {
+        temp[k++] = array[j++];
+    }
+
+    // Copy the sorted elements back into the original array
+    for (int idx = left; idx <= right; idx++) {
+        array[idx] = temp[idx];
+    }
+}
+
+
+// Merge Sort Step
+void mergeSortStep(std::vector<int>& array, std::vector<int>& temp, int& size, int& left, bool& sorted) {
+    int n = array.size();
+
+    if (size >= n) {
+        sorted = true; // If the size exceeds the array, sorting is complete
+        return;
+    }
+
+    int mid = std::min(left + size - 1, n-1);      // Calculate mid-
+
+    int right = std::min(left + 2*size - 1, n - 1); // Ensure the right index doesn't exceed array bounds
+
+    // Merge the current segment
+    merge(array, left, mid, right, temp);
+
+    // Move to the next segment
+    left += 2*size;
+
+    // If the entire array has been processed, double the size of segments
+    if (left >= n) {
+        left = 0;  // Reset left index for the next pass
+        size *= 2; // Double the size of the segments
+    }
+}
+
+
 // Draw bars for sorting visualization
-void drawBars(sf::RenderWindow& window, const std::vector<int>& array, int startX, float barWidth, sf::Color color) {
+void drawBars(sf::RenderWindow& window, const std::vector<int>& array, int startX, int startY, float barWidth, sf::Color color) {
     for (size_t i = 0; i < array.size(); i++) {
         sf::RectangleShape bar(sf::Vector2f(barWidth - 1, array[i]));
-        bar.setPosition(startX + i * barWidth, WINDOW_HEIGHT/2 - array[i]);
+        bar.setPosition(startX + i * barWidth, startY - array[i]);
         bar.setFillColor(color);
         window.draw(bar);
     }
@@ -103,22 +161,23 @@ int main() {
 
     // Randomize the height of bars
     std::srand(static_cast<unsigned>(std::time(0)));
-    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS), selectionArray(NUM_BARS);
+    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS), selectionArray(NUM_BARS), mergeArray(NUM_BARS), tempMergeArray(NUM_BARS);
     for (int i = 0; i < NUM_BARS; i++) {
         int height = (std::rand() % (WINDOW_HEIGHT/2 - 50)) + 10; // we add 10 minimum height, so that the value is not 0 which will make it invisible to see the bar
         bubbleArray[i] = height;
         insertionArray[i] = height;
         selectionArray[i] = height;
+        mergeArray[i] = height;
     }
 
     // Variables for sorting
-    int bubbleI = 0, bubbleJ = 0, insertionI = 1, insertionJ = 1, selectionI = 0, selectionJ = 0, selectionMinIndex = 0;
-    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false;
-    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false;
+    int bubbleI = 0, bubbleJ = 0, insertionI = 1, insertionJ = 1, selectionI = 0, selectionJ = 0, selectionMinIndex = 0, mergeSize = 1, mergeLeft = 0;
+    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false, mergeSorted = false;
+    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false, consolePrintMergeSortTime = false;
 
     // Timers for sorting algorithms
-    sf::Clock bubbleClock, insertionClock, selectionClock;
-    float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0;
+    sf::Clock bubbleClock, insertionClock, selectionClock, mergeClock;
+    float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0, mergeElapsed = 0;
 
     // Main loop
     while (window.isOpen()) {
@@ -150,13 +209,20 @@ int main() {
             selectionElapsed += selectionClock.getElapsedTime().asSeconds();
         }
 
+        // Perform Merge Sort step and update timer
+        if (!mergeSorted) {
+            mergeClock.restart();  // Start timing Insertion Sort step
+            mergeSortStep(mergeArray, tempMergeArray, mergeSize, mergeLeft, mergeSorted);
+            mergeElapsed += mergeClock.getElapsedTime().asSeconds();
+        }
+
         // Render visualization
         window.clear(sf::Color::Black);
 
         // Draw Bubble Sort bars
         if (!bubbleSorted) {
             bubbleClock.restart();
-            drawBars(window, bubbleArray, 0, BAR_WIDTH, sf::Color::Red);
+            drawBars(window, bubbleArray, 0, WINDOW_HEIGHT / 2, BAR_WIDTH, sf::Color::Red);
             bubbleElapsed += bubbleClock.getElapsedTime().asSeconds();
         }
         else {
@@ -164,13 +230,13 @@ int main() {
                 consolePrintBubbleSortTime = true;
                 std::cout << "Bubble Sorting Completed in " << std::to_string(bubbleElapsed) << " seconds!\n";
             }
-            drawBars(window, bubbleArray, 0, BAR_WIDTH, sf::Color::Red);
+            drawBars(window, bubbleArray, 0,WINDOW_HEIGHT/2, BAR_WIDTH, sf::Color::Red);
         }
 
         // Draw Insertion Sort bars
         if (!insertionSorted) {
             insertionClock.restart();
-            drawBars(window, insertionArray, WINDOW_WIDTH / 3, BAR_WIDTH, sf::Color::Blue);
+            drawBars(window, insertionArray, WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2, BAR_WIDTH, sf::Color::Blue);
             insertionElapsed += insertionClock.getElapsedTime().asSeconds();
         }
         else {
@@ -178,13 +244,13 @@ int main() {
                 consolePrintInsertionSortTime = true;
                 std::cout << "Insertion Sorting Completed in " << std::to_string(insertionElapsed) << " seconds!\n";
             }
-            drawBars(window, insertionArray, WINDOW_WIDTH / 3, BAR_WIDTH, sf::Color::Blue);
+            drawBars(window, insertionArray, WINDOW_WIDTH / 3, WINDOW_HEIGHT / 2, BAR_WIDTH, sf::Color::Blue);
         }
 
         // Draw Selection Sort bars
         if (!selectionSorted) {
             selectionClock.restart();
-            drawBars(window, selectionArray, WINDOW_WIDTH* 2 / 3, BAR_WIDTH, sf::Color::Green);
+            drawBars(window, selectionArray, WINDOW_WIDTH* 2 / 3, WINDOW_HEIGHT / 2, BAR_WIDTH, sf::Color::Green);
             selectionElapsed += selectionClock.getElapsedTime().asSeconds();
         }
         else {
@@ -192,7 +258,21 @@ int main() {
                 consolePrintSelectionSortTime = true;
                 std::cout << "Selection Sorting Completed in " << std::to_string(selectionElapsed) << " seconds!\n";            
             }
-            drawBars(window, selectionArray, WINDOW_WIDTH * 2 / 3, BAR_WIDTH, sf::Color::Green);
+            drawBars(window, selectionArray, WINDOW_WIDTH * 2 / 3, WINDOW_HEIGHT / 2, BAR_WIDTH, sf::Color::Green);
+        }
+
+        // Draw Merge Sort bars
+        if (!mergeSorted) {
+            mergeClock.restart();
+            drawBars(window, mergeArray, 0, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::Yellow);
+            mergeElapsed += mergeClock.getElapsedTime().asSeconds();
+        }
+        else {
+            if (!consolePrintMergeSortTime) {
+                consolePrintMergeSortTime = true;
+                std::cout << "Merge Sorting Completed in " << std::to_string(mergeElapsed) << " seconds!\n";
+            }
+            drawBars(window, mergeArray, 0, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::Yellow);
         }
 
         // Display sorting times
@@ -211,10 +291,15 @@ int main() {
         selectionTimeText.setPosition(WINDOW_WIDTH * 2 / 3 + 10, 10);
         window.draw(selectionTimeText);
 
+        sf::Text mergeTimeText("Merge Sort Time: " + formatTime(mergeElapsed), font, 20);
+        mergeTimeText.setFillColor(sf::Color::White);
+        mergeTimeText.setPosition(10, WINDOW_HEIGHT/2 + 10);
+        window.draw(mergeTimeText);
+
         window.display();
 
         // Slow down the visualization for clarity
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     return 0;
