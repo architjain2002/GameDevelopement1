@@ -1,6 +1,7 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
 #include <vector>
+#include <stack>
 #include <cstdlib>
 #include <ctime>
 #include <thread>
@@ -12,12 +13,10 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
 // Sorting bars
-const int NUM_BARS = 100;
+const int NUM_BARS = 30;
 const float BAR_WIDTH = static_cast<float>(WINDOW_WIDTH) / (3 * NUM_BARS);
 
 
-
-void drawBars(sf::RenderWindow& window, const std::vector<int>& array, int startX, int startY, float barWidth, sf::Color color);
 // Bubble Sort Step
 void bubbleSortStep(std::vector<int>& array, int& i, int& j, bool& sorted) {
     if (i < array.size() - 1) {
@@ -76,63 +75,7 @@ void selectionSortStep(std::vector<int>& array, int& i, int& j, int& minIndex, b
     }
 }
 
-//void merge(std::vector<int>& array, int left, int mid, int right, std::vector<int> temp, sf::RenderWindow& window) {
-//    int i = left, j = mid + 1, k = left;
-//
-//
-//    // Merge the two subarrays into a temporary array
-//    while (i <= mid && j <= right) {
-//        if (array[i] <= array[j]) {
-//            temp[k++] = array[i++];
-//        }
-//        else {
-//            temp[k++] = array[j++];
-//        }
-//    }
-//
-//    // Copy remaining elements from left subarray
-//    while (i <= mid) {
-//        temp[k++] = array[i++];
-//    }
-//
-//    // Copy remaining elements from right subarray
-//    while (j <= right) {
-//        temp[k++] = array[j++];
-//    }
-//
-//    // Copy the sorted elements back into the original array
-//    for (int idx = left; idx <= right; idx++) {
-//        array[idx] = temp[idx];
-//    }
-//}
-//
-//
-//// Merge Sort Step
-//void mergeSortStep(std::vector<int>& array, std::vector<int> temp, int& size, int& left, bool& sorted, sf::RenderWindow& window) {
-//    int n = array.size();
-//
-//    if (size >= n) {
-//        sorted = true; // If the size exceeds the array, sorting is complete
-//        return;
-//    }
-//
-//    int mid = std::min(left + size - 1, n-1);      // Calculate mid-
-//
-//    int right = std::min(left + 2*size - 1, n - 1); // Ensure the right index doesn't exceed array bounds
-//
-//    // Merge the current segment
-//    merge(array, left, mid, right, temp, window);
-//
-//    // Move to the next segment
-//    left += 2*size;
-//
-//    // If the entire array has been processed, double the size of segments
-//    if (left >= n) {
-//        left = 0;  // Reset left index for the next pass
-//        size *= 2; // Double the size of the segments
-//    }
-//}
-
+// Merge Sort Step
 struct MergeState {
     int left;           // Left index of the current segment
     int mid;            // Midpoint of the current segment
@@ -225,6 +168,94 @@ void mergeSortStep(std::vector<int>& array, int& size, int& left, bool& sorted, 
     }
 }
 
+// Quick Sort Step
+struct QuickState {
+    std::stack<std::pair<int, int>> st; // Pair for low and high indices
+    int low;
+    int high;
+    int i;
+    int j;
+    int pivotIndex;
+    int partitionStep;
+    int step;
+    bool partitionComplete;
+};
+
+void partition(std::vector<int>& array, QuickState& quickState) {
+    int low = quickState.low;
+    int high = quickState.high;
+    int& i = quickState.i;
+    int& j = quickState.j;
+
+    if (quickState.partitionStep == 1) {
+        i = low - 1;
+        j = low;
+        quickState.partitionStep = 2; // Start processing
+    }
+
+    if (quickState.partitionStep == 2) {
+        int pivot = array[high];
+
+        if (j <= high - 1) {
+            if (array[j] < pivot) {
+                std::swap(array[++i], array[j]);
+            }
+            j++;
+        }
+        else {
+            std::swap(array[i + 1], array[high]);
+            quickState.pivotIndex = ++i;
+            quickState.partitionStep = 1; // Reset for the next partition
+            quickState.partitionComplete = true;
+        }
+    }
+}
+
+void quickSortStep(std::vector<int>& array, QuickState& quickState, bool& sorted) {
+    if (quickState.step == 1) {
+        // Initialize stack with the first range
+        quickState.st.push({ quickState.low, quickState.high });
+        quickState.step = 2;
+    }
+
+    if (quickState.step == 2) {
+        if (!quickState.st.empty()) {
+            int low = quickState.st.top().first;
+            int high = quickState.st.top().second;
+            quickState.st.pop();
+            quickState.low = low;
+            quickState.high = high;
+            quickState.partitionComplete = false;
+            quickState.step = 3;
+        }
+        else {
+            sorted = true;
+        }
+    }
+
+    if (quickState.step == 3) {
+        if (!quickState.partitionComplete) {
+            partition(array, quickState);
+        }
+        else {
+            quickState.step = 4; // Move to the next partitioning phase
+        }
+    }
+
+    if (quickState.step == 4) {
+        int pivot = quickState.pivotIndex;
+
+        // Push subranges to the stack for further sorting
+        if (pivot - 1 > quickState.low) {
+            quickState.st.push({ quickState.low, pivot - 1 });
+        }
+        if (pivot + 1 < quickState.high) {
+            quickState.st.push({ pivot + 1, quickState.high });
+        }
+
+        quickState.step = 2; // Go back to process the next range
+    }
+}
 
 
 // Draw bars for sorting visualization
@@ -257,26 +288,32 @@ int main() {
 
     // Randomize the height of bars
     std::srand(static_cast<unsigned>(std::time(0)));
-    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS), selectionArray(NUM_BARS), mergeArray(NUM_BARS), tempMergeArray(NUM_BARS);
+    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS), selectionArray(NUM_BARS), mergeArray(NUM_BARS), quickArray(NUM_BARS);
     for (int i = 0; i < NUM_BARS; i++) {
         int height = (std::rand() % (WINDOW_HEIGHT/2 - 50)) + 10; // we add 10 minimum height, so that the value is not 0 which will make it invisible to see the bar
         bubbleArray[i] = height;
         insertionArray[i] = height;
         selectionArray[i] = height;
         mergeArray[i] = height;
+        quickArray[i] = height;
     }
 
     // Variables for sorting
     int bubbleI = 0, bubbleJ = 0, insertionI = 1, insertionJ = 1, selectionI = 0, selectionJ = 0, selectionMinIndex = 0, mergeSize = 1, mergeLeft = 0;
-    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false, mergeSorted = false, mergingFlag = false;
-    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false, consolePrintMergeSortTime = false;
+    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false, mergeSorted = false, mergingFlag = false, quickSorted = false;
+    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false, consolePrintMergeSortTime = false, consolePrintQuickSortTime = false, consolePrintTotalTime = false;
 
     // Timers for sorting algorithms
-    sf::Clock bubbleClock, insertionClock, selectionClock, mergeClock;
-    float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0, mergeElapsed = 0;
+    sf::Clock bubbleClock, insertionClock, selectionClock, mergeClock, quickClock, totalClock;
+    float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0, mergeElapsed = 0, quickElapsed = 0, totalElapsed = 0;
 
     MergeState mergeState;
-    
+    QuickState quickState;
+    quickState.low = 0;
+    quickState.high = quickArray.size()-1;
+    quickState.step = 1;
+    quickState.partitionStep = 1;
+    quickState.partitionComplete = false;
 
     // Main loop
     while (window.isOpen()) {
@@ -286,7 +323,7 @@ int main() {
                 window.close();
             }
         }
-
+        
         // Render visualization
         window.clear(sf::Color::Black);
 
@@ -311,18 +348,18 @@ int main() {
             selectionElapsed += selectionClock.getElapsedTime().asSeconds();
         }
 
-        // Perform Merge Sort step and update timer
-        //if (!mergeSorted) {
-        //    mergeClock.restart();  // Start timing Insertion Sort step
-        //    mergeSortStep(mergeArray, mergeArray, mergeSize, mergeLeft, mergeSorted, window);
-        //    mergeElapsed += mergeClock.getElapsedTime().asSeconds();
-        //}
-
         if (!mergeSorted) {
             mergeClock.restart();
             mergeSortStep(mergeArray, mergeSize, mergeLeft, mergeSorted, mergeState, mergingFlag);
             mergeElapsed += mergeClock.getElapsedTime().asSeconds();
         }
+
+        if (!quickSorted) {
+            quickClock.restart();
+            quickSortStep(quickArray, quickState, quickSorted);
+            quickElapsed += quickClock.getElapsedTime().asSeconds();
+        }
+
 
         // Draw Bubble Sort bars
         if (!bubbleSorted) {
@@ -380,6 +417,25 @@ int main() {
             drawBars(window, mergeArray, 0, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::Yellow);
         }
 
+        // Draw Quick Sort bars
+        if (!quickSorted) {
+            quickClock.restart();
+            drawBars(window, quickArray, WINDOW_WIDTH / 3, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::White);
+            quickElapsed += quickClock.getElapsedTime().asSeconds();
+        }
+        else {
+            if (!consolePrintQuickSortTime) {
+                consolePrintQuickSortTime = true;
+                std::cout << "Quick Sorting Completed in " << std::to_string(quickElapsed) << " seconds!\n";
+            }
+            drawBars(window, quickArray, WINDOW_WIDTH / 3, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::White);
+        }
+
+        if (!consolePrintTotalTime && consolePrintBubbleSortTime && consolePrintInsertionSortTime && consolePrintSelectionSortTime && consolePrintMergeSortTime && consolePrintQuickSortTime) {
+            std::cout << "All Sorting Completed in " << std::to_string(totalClock.getElapsedTime().asSeconds()) << " seconds!\n";
+            consolePrintTotalTime = true;
+        }
+
         // Display sorting times
         sf::Text bubbleTimeText("Bubble Sort Time: " + formatTime(bubbleElapsed), font, 20);
         bubbleTimeText.setFillColor(sf::Color::White);
@@ -401,10 +457,15 @@ int main() {
         mergeTimeText.setPosition(10, WINDOW_HEIGHT/2 + 10);
         window.draw(mergeTimeText);
 
+        sf::Text quickTimeText("Quick Sort Time: " + formatTime(quickElapsed), font, 20);
+        quickTimeText.setFillColor(sf::Color::White);
+        quickTimeText.setPosition(WINDOW_WIDTH / 3 + 10, WINDOW_HEIGHT / 2 + 10);
+        window.draw(quickTimeText);
+
         window.display();
 
         // Slow down the visualization for clarity
-        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 
     return 0;
