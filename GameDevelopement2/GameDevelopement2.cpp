@@ -13,7 +13,7 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
 // Sorting bars
-const int NUM_BARS = 30;
+const int NUM_BARS = 100;
 const float BAR_WIDTH = static_cast<float>(WINDOW_WIDTH) / (3 * NUM_BARS);
 
 
@@ -258,6 +258,104 @@ void quickSortStep(std::vector<int>& array, QuickState& quickState, bool& sorted
 }
 
 
+// Heap Sort Step
+struct HeapifyState {
+    int i;            // Current node index
+    int n;            // Size of the heap
+    int largest;      // Index of the largest value
+    int left;         // Index of the left child
+    int right;        // Index of the right child
+    int step;         // Current step in heapify
+    bool complete;    // Indicates if heapify is done
+};
+
+// Function to initialize heapify state
+void initializeHeapifyState(HeapifyState& heapifyState, int i, int n) {
+    heapifyState.i = i;
+    heapifyState.n = n;
+    heapifyState.largest = i;
+    heapifyState.left = 2 * i + 1;
+    heapifyState.right = 2 * i + 2;
+    heapifyState.step = 1;
+    heapifyState.complete = false;
+}
+
+// Step-by-step heapify function
+void heapifyStep(std::vector<int>& array, HeapifyState& heapifyState) {
+    int i = heapifyState.i;
+    int n = heapifyState.n;
+
+    if (heapifyState.step == 1) {
+        // Compare root with the left child
+        if (heapifyState.left < n && array[heapifyState.left] > array[heapifyState.largest]) {
+            heapifyState.largest = heapifyState.left;
+        }
+        heapifyState.step++;
+    }
+    else if (heapifyState.step == 2) {
+        // Compare root with the right child
+        if (heapifyState.right < n && array[heapifyState.right] > array[heapifyState.largest]) {
+            heapifyState.largest = heapifyState.right;
+        }
+        heapifyState.step++;
+    }
+    else if (heapifyState.step == 3) {
+        // Swap if necessary and recurse
+        if (heapifyState.largest != i) {
+            std::swap(array[i], array[heapifyState.largest]);
+            initializeHeapifyState(heapifyState, heapifyState.largest, n); // Reinitialize for the subtree
+        }
+        else {
+            heapifyState.complete = true; // No swaps needed, heapify is done
+        }
+    }
+}
+
+// Heap Sort Step-by-Step with Heapify Visualization
+struct HeapState {
+    int heapSize;            // Current size of the heap
+    int buildStep;           // Tracks heap building steps
+    int sortStep;            // Tracks heap sorting steps
+    bool buildComplete;      // Flag indicating if heap is built
+    HeapifyState heapifyState; // State of current heapify operation
+};
+
+void heapSortStep(std::vector<int>& array, HeapState& heapState, bool& sorted) {
+    if (!heapState.buildComplete) {
+        // Build the max heap step by step
+        if (heapState.heapifyState.complete) {
+            if (heapState.buildStep < heapState.heapSize / 2) {
+                int i = (heapState.heapSize / 2 - 1) - heapState.buildStep;
+                initializeHeapifyState(heapState.heapifyState, i, heapState.heapSize);
+                heapState.buildStep++;
+            }
+            else {
+                heapState.buildComplete = true;
+            }
+        }
+        else {
+            heapifyStep(array, heapState.heapifyState);
+        }
+    }
+    else {
+        // Sort the heap step by step
+        if (heapState.sortStep < heapState.heapSize - 1) {
+            if (heapState.heapifyState.complete) {
+                int i = heapState.heapSize - 1 - heapState.sortStep;
+                std::swap(array[0], array[i]); // Move max to the end
+                initializeHeapifyState(heapState.heapifyState, 0, i); // Reinitialize heapify for remaining heap
+                heapState.sortStep++;
+            }
+            else {
+                heapifyStep(array, heapState.heapifyState);
+            }
+        }
+        else {
+            sorted = true; // Sorting is complete
+        }
+    }
+}
+
 // Draw bars for sorting visualization
 void drawBars(sf::RenderWindow& window, const std::vector<int>& array, int startX, int startY, float barWidth, sf::Color color) {
     for (size_t i = 0; i < array.size(); i++) {
@@ -288,7 +386,7 @@ int main() {
 
     // Randomize the height of bars
     std::srand(static_cast<unsigned>(std::time(0)));
-    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS), selectionArray(NUM_BARS), mergeArray(NUM_BARS), quickArray(NUM_BARS);
+    std::vector<int> bubbleArray(NUM_BARS), insertionArray(NUM_BARS), selectionArray(NUM_BARS), mergeArray(NUM_BARS), quickArray(NUM_BARS), heapArray(NUM_BARS);
     for (int i = 0; i < NUM_BARS; i++) {
         int height = (std::rand() % (WINDOW_HEIGHT/2 - 50)) + 10; // we add 10 minimum height, so that the value is not 0 which will make it invisible to see the bar
         bubbleArray[i] = height;
@@ -296,16 +394,17 @@ int main() {
         selectionArray[i] = height;
         mergeArray[i] = height;
         quickArray[i] = height;
+        heapArray[i] = height;
     }
 
     // Variables for sorting
     int bubbleI = 0, bubbleJ = 0, insertionI = 1, insertionJ = 1, selectionI = 0, selectionJ = 0, selectionMinIndex = 0, mergeSize = 1, mergeLeft = 0;
-    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false, mergeSorted = false, mergingFlag = false, quickSorted = false;
-    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false, consolePrintMergeSortTime = false, consolePrintQuickSortTime = false, consolePrintTotalTime = false;
+    bool bubbleSorted = false, insertionSorted = false, selectionSorted = false, mergeSorted = false, mergingFlag = false, quickSorted = false, heapSorted = false;
+    bool consolePrintBubbleSortTime = false, consolePrintInsertionSortTime = false, consolePrintSelectionSortTime = false, consolePrintMergeSortTime = false, consolePrintQuickSortTime = false,consolePrintHeapSortTime = false, consolePrintTotalTime = false;
 
     // Timers for sorting algorithms
-    sf::Clock bubbleClock, insertionClock, selectionClock, mergeClock, quickClock, totalClock;
-    float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0, mergeElapsed = 0, quickElapsed = 0, totalElapsed = 0;
+    sf::Clock bubbleClock, insertionClock, selectionClock, mergeClock, quickClock, heapClock, totalClock;
+    float bubbleElapsed = 0, insertionElapsed = 0, selectionElapsed = 0, mergeElapsed = 0, quickElapsed = 0, heapElapsed = 0, totalElapsed = 0;
 
     MergeState mergeState;
     QuickState quickState;
@@ -314,6 +413,15 @@ int main() {
     quickState.step = 1;
     quickState.partitionStep = 1;
     quickState.partitionComplete = false;
+
+    HeapState heapState;
+    heapState.heapSize = static_cast<int> (heapArray.size());
+    heapState.buildStep = 0;
+    heapState.sortStep = 0;
+    heapState.buildComplete = false;
+
+    int heapi = heapState.heapSize / 2 - 1;
+    heapState.heapifyState = { heapi, heapState.heapSize, heapi, 2*heapi + 1, 2*heapi - 1, 1, false };
 
     // Main loop
     while (window.isOpen()) {
@@ -348,16 +456,25 @@ int main() {
             selectionElapsed += selectionClock.getElapsedTime().asSeconds();
         }
 
+        // Perform Merge Sort step and update timer
         if (!mergeSorted) {
             mergeClock.restart();
             mergeSortStep(mergeArray, mergeSize, mergeLeft, mergeSorted, mergeState, mergingFlag);
             mergeElapsed += mergeClock.getElapsedTime().asSeconds();
         }
 
+        // Perform Quick Sort step and update timer
         if (!quickSorted) {
             quickClock.restart();
             quickSortStep(quickArray, quickState, quickSorted);
             quickElapsed += quickClock.getElapsedTime().asSeconds();
+        }
+
+        // Perform  Heap Sort step and update timer
+        if (!heapSorted) {
+            heapClock.restart();
+            heapSortStep(heapArray, heapState, heapSorted);
+            heapElapsed += heapClock.getElapsedTime().asSeconds();
         }
 
 
@@ -431,7 +548,22 @@ int main() {
             drawBars(window, quickArray, WINDOW_WIDTH / 3, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::White);
         }
 
-        if (!consolePrintTotalTime && consolePrintBubbleSortTime && consolePrintInsertionSortTime && consolePrintSelectionSortTime && consolePrintMergeSortTime && consolePrintQuickSortTime) {
+        // Draw Heap Sort bars
+        if (!heapSorted) {
+            heapClock.restart();
+            drawBars(window, heapArray, WINDOW_WIDTH * 2 / 3, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::Magenta);
+            heapElapsed += heapClock.getElapsedTime().asSeconds();
+        }
+        else {
+            if (!consolePrintHeapSortTime) {
+                consolePrintHeapSortTime = true;
+                std::cout << "Heap Sorting Completed in " << std::to_string(heapElapsed) << " seconds!\n";
+            }
+            drawBars(window, heapArray, WINDOW_WIDTH * 2 / 3, WINDOW_HEIGHT, BAR_WIDTH, sf::Color::Magenta);
+        }
+
+        // Display Total Sorting time for all the sort algorithms to complete
+        if (!consolePrintTotalTime && consolePrintBubbleSortTime && consolePrintInsertionSortTime && consolePrintSelectionSortTime && consolePrintMergeSortTime && consolePrintQuickSortTime && consolePrintHeapSortTime) {
             std::cout << "All Sorting Completed in " << std::to_string(totalClock.getElapsedTime().asSeconds()) << " seconds!\n";
             consolePrintTotalTime = true;
         }
@@ -461,6 +593,11 @@ int main() {
         quickTimeText.setFillColor(sf::Color::White);
         quickTimeText.setPosition(WINDOW_WIDTH / 3 + 10, WINDOW_HEIGHT / 2 + 10);
         window.draw(quickTimeText);
+
+        sf::Text heapTimeText("Heap Sort Time: " + formatTime(heapElapsed), font, 20);
+        heapTimeText.setFillColor(sf::Color::White);
+        heapTimeText.setPosition(WINDOW_WIDTH * 2/ 3 + 10, WINDOW_HEIGHT / 2 + 10);
+        window.draw(heapTimeText);
 
         window.display();
 
